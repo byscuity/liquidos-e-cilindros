@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Recipientes Cilíndricos - Laranja e Roxo</title>
+    <title>Recipientes Cilíndricos - Troca de Líquidos</title>
     <style>
         * {
             margin: 0;
@@ -12,304 +12,264 @@
         }
 
         body {
-            background: #0a0a0a;
+            background: #1a1a2e;
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-family: system-ui, 'Segoe UI', monospace;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
         canvas {
             display: block;
             margin: 0 auto;
-            background: #0a0a0a;
-            border-radius: 0px;
+            background: #0f0f1a;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
         }
     </style>
 </head>
 <body>
-<canvas id="canvas" width="900" height="500"></canvas>
+    <canvas id="canvas" width="1000" height="600"></canvas>
 
-<script>
-    (function() {
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-
-        const W = 900;
-        const H = 500;
-        canvas.width = W;
-        canvas.height = H;
-
-        // Dimensões dos recipientes cilíndricos
-        const cylinderWidth = 140;
-        const cylinderHeight = 280;
-        const leftCylX = 180;
-        const rightCylX = W - 180 - cylinderWidth;
-        const cylinderY = (H - cylinderHeight) / 2; // centralizado verticalmente
-
-        // Raio das bordas arredondadas (opcional, para efeito cilíndrico)
-        const radiusCorner = 12;
-
-        // Níveis dos líquidos (altura em pixels, medida de cima para baixo)
-        // Valores máximos = cylinderHeight, mínimos = 0
-        let leftLiquidHeight = cylinderHeight;     // começa cheio (laranja)
-        let rightLiquidHeight = cylinderHeight * 0.25; // começa com 1/4 (roxo)
-
-        // Estado da animação
-        let fase = 0; // 0 = laranja diminuindo (esq) e roxo subindo (dir)
-                      // 1 = pausa
-                      // 2 = reverso: laranja subindo, roxo descendo
-                      // 3 = pausa
-        let timer = 0;
-        let lastTimestamp = 0;
-
-        // Velocidade de transição (pixels por segundo)
-        const transitionSpeed = 120; // pixels/segundo
-
-        // Níveis alvo
-        const leftFull = cylinderHeight;      // 100%
-        const leftQuarter = cylinderHeight * 0.25;   // 1/4
-        const rightFull = cylinderHeight;     // 100%
-        const rightQuarter = cylinderHeight * 0.25;  // 1/4
-        const rightThreeQuarters = cylinderHeight * 0.75; // 3/4
-
-        // Estados alvos dinâmicos
-        let leftTarget = leftQuarter;     // na fase 0: esquerda vai para 1/4
-        let rightTarget = rightThreeQuarters; // direita vai para 3/4
-
-        // Função para desenhar recipiente cilíndrico transparente com bordas
-        function drawCylinder(x, y, w, h) {
-            ctx.save();
-            ctx.beginPath();
-            // Retângulo com cantos arredondados (efeito cilíndrico suave)
-            ctx.moveTo(x + radiusCorner, y);
-            ctx.lineTo(x + w - radiusCorner, y);
-            ctx.quadraticCurveTo(x + w, y, x + w, y + radiusCorner);
-            ctx.lineTo(x + w, y + h - radiusCorner);
-            ctx.quadraticCurveTo(x + w, y + h, x + w - radiusCorner, y + h);
-            ctx.lineTo(x + radiusCorner, y + h);
-            ctx.quadraticCurveTo(x, y + h, x, y + h - radiusCorner);
-            ctx.lineTo(x, y + radiusCorner);
-            ctx.quadraticCurveTo(x, y, x + radiusCorner, y);
-            ctx.closePath();
+    <script>
+        (function() {
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
             
-            // Preenchimento transparente (apenas para hit area? não, sem preenchimento)
-            // Contorno branco fino
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2.2;
-            ctx.stroke();
+            const W = 1000;
+            const H = 600;
+            canvas.width = W;
+            canvas.height = H;
             
-            // Adicionar leve brilho de reflexo na borda (opcional mas sem poluição)
-            ctx.beginPath();
-            ctx.moveTo(x + 8, y + 5);
-            ctx.lineTo(x + w - 8, y + 5);
-            ctx.strokeStyle = '#ffffff30';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-            ctx.restore();
-        }
-
-        // Desenha líquido dentro do recipiente cilíndrico (cor viva uniforme)
-        function drawLiquid(x, y, w, h, liquidHeightPx, color) {
-            if (liquidHeightPx <= 0) return;
+            // Posições dos recipientes
+            const leftCylX = 250;
+            const rightCylX = 750;
+            const cylinderY = 200;
+            const cylinderRadius = 80;
+            const cylinderHeight = 320;
             
-            // Altura do líquido a partir da BASE do recipiente
-            const liquidHeight = Math.min(h, Math.max(0, liquidHeightPx));
-            const liquidY = y + (h - liquidHeight);
+            // Alturas dos líquidos (em pixels, relativo ao fundo)
+            let leftLiquidHeight = cylinderHeight;      // começa cheio (3/4 da altura total? não, começa cheio)
+            let rightLiquidHeight = 0;                   // começa vazio
             
-            ctx.save();
-            ctx.beginPath();
-            // Recortar formato cilíndrico (mesmo arredondamento)
-            ctx.moveTo(x + radiusCorner, y);
-            ctx.lineTo(x + w - radiusCorner, y);
-            ctx.quadraticCurveTo(x + w, y, x + w, y + radiusCorner);
-            ctx.lineTo(x + w, y + h - radiusCorner);
-            ctx.quadraticCurveTo(x + w, y + h, x + w - radiusCorner, y + h);
-            ctx.lineTo(x + radiusCorner, y + h);
-            ctx.quadraticCurveTo(x, y + h, x, y + h - radiusCorner);
-            ctx.lineTo(x, y + radiusCorner);
-            ctx.quadraticCurveTo(x, y, x + radiusCorner, y);
-            ctx.closePath();
-            ctx.clip();
+            // Estado da animação
+            let phase = 0; // 0: left diminuindo, right subindo; 1: pausa; 2: left subindo, right diminuindo; 3: pausa
+            let progress = 0; // 0 a 1
+            let lastTimestamp = 0;
+            let animationId = null;
             
-            // Desenhar retângulo do líquido (cor sólida viva)
-            ctx.fillStyle = color;
-            ctx.fillRect(x, liquidY, w, liquidHeight);
+            // Parâmetros
+            const transitionDuration = 2000; // 2 segundos para transição
+            const pauseDuration = 500;        // 0.5 segundos de pausa
             
-            // Pequeno degradê sutil para dar efeito de volume (opcional, sem comprometer simplicidade)
-            // mas para manter "cor viva uniforme" sem excessos, apenas uma leve sobreposição suave
-            // NÃO adicionamos gradiente complexo. Apenas cor sólida.
-            ctx.restore();
+            // Níveis alvo (proporção da altura do cilindro)
+            const TARGET_LEFT_LOW = cylinderHeight * 0.25;     // 1/4 do recipiente
+            const TARGET_LEFT_HIGH = cylinderHeight * 0.75;    // 3/4 do recipiente
+            const TARGET_RIGHT_LOW = cylinderHeight * 0.25;    // 1/4 do recipiente
+            const TARGET_RIGHT_HIGH = cylinderHeight * 0.75;   // 3/4 do recipiente
             
-            // Borda extra de contorno na superfície do líquido (linha horizontal sutil)
-            ctx.beginPath();
-            ctx.moveTo(x + 2, liquidY);
-            ctx.lineTo(x + w - 2, liquidY);
-            ctx.strokeStyle = '#ffffff60';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-        }
-
-        // Atualiza a transição dos líquidos baseado no tempo
-        function updateLiquids(deltaSec) {
-            if (deltaSec > 0.05) deltaSec = 0.05;
-            if (deltaSec <= 0) return;
-
-            // FASE 0: Laranja diminuindo (esq) de cheio para 1/4, Roxo subindo (dir) de 1/4 para 3/4
-            if (fase === 0) {
-                let leftChanged = false;
-                let rightChanged = false;
+            let startLeftHeight = cylinderHeight;
+            let startRightHeight = 0;
+            let targetLeftHeight = TARGET_LEFT_LOW;
+            let targetRightHeight = TARGET_RIGHT_HIGH;
+            
+            let pauseStartTime = 0;
+            let transitionStartTime = 0;
+            let currentState = "transition"; // "transition" ou "pause"
+            
+            // Função para desenhar cilindro 3D transparente
+            function drawCylinder(x, y, radius, height, liquidHeight, liquidColor) {
+                const topY = y;
+                const bottomY = y + height;
+                const liquidBottomY = bottomY;
+                const liquidTopY = bottomY - liquidHeight;
                 
-                if (Math.abs(leftLiquidHeight - leftTarget) > 0.5) {
-                    const step = transitionSpeed * deltaSec;
-                    if (leftLiquidHeight > leftTarget) {
-                        leftLiquidHeight = Math.max(leftTarget, leftLiquidHeight - step);
-                    } else {
-                        leftLiquidHeight = Math.min(leftTarget, leftLiquidHeight + step);
+                // 1. Desenhar a face inferior do cilindro (elipse) - parte de trás
+                ctx.save();
+                
+                // Corpo do cilindro (superfície lateral transparente)
+                ctx.beginPath();
+                ctx.rect(x - radius, topY, radius * 2, height);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(200, 200, 200, 0.6)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Desenhar as bordas verticais do cilindro
+                ctx.beginPath();
+                ctx.moveTo(x - radius, topY);
+                ctx.lineTo(x - radius, bottomY);
+                ctx.moveTo(x + radius, topY);
+                ctx.lineTo(x + radius, bottomY);
+                ctx.stroke();
+                
+                // Face superior (elipse)
+                ctx.beginPath();
+                ctx.ellipse(x, topY, radius, radius * 0.35, 0, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(200, 200, 200, 0.7)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Face inferior (elipse - fundo)
+                ctx.beginPath();
+                ctx.ellipse(x, bottomY, radius, radius * 0.35, 0, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(200, 200, 200, 0.5)';
+                ctx.stroke();
+                
+                // ========== LÍQUIDO ==========
+                if (liquidHeight > 0) {
+                    const liquidTopVisualY = liquidTopY;
+                    const liquidBottomVisualY = bottomY;
+                    
+                    // Salvar contexto para clip do líquido dentro do cilindro
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.ellipse(x, bottomY, radius, radius * 0.35, 0, 0, Math.PI * 2);
+                    ctx.rect(x - radius, topY, radius * 2, height);
+                    ctx.clip();
+                    
+                    // Desenhar o líquido (cor uniforme viva)
+                    ctx.fillStyle = liquidColor;
+                    ctx.fillRect(x - radius, liquidTopVisualY, radius * 2, liquidHeight);
+                    
+                    // Brilho sutil na superfície do líquido
+                    ctx.beginPath();
+                    ctx.ellipse(x, liquidTopVisualY, radius * 0.85, radius * 0.25, 0, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+                    ctx.fill();
+                    
+                    ctx.restore();
+                    
+                    // Borda do líquido na superfície
+                    ctx.beginPath();
+                    ctx.ellipse(x, liquidTopVisualY, radius, radius * 0.35, 0, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                }
+                
+                // Reforçar bordas laterais novamente por cima do líquido
+                ctx.beginPath();
+                ctx.moveTo(x - radius, topY);
+                ctx.lineTo(x - radius, bottomY);
+                ctx.moveTo(x + radius, topY);
+                ctx.lineTo(x + radius, bottomY);
+                ctx.strokeStyle = 'rgba(200, 200, 200, 0.6)';
+                ctx.stroke();
+                
+                ctx.restore();
+            }
+            
+            // Atualizar lógica de transição e pausa
+            function updateAnimation(now) {
+                if (currentState === "transition") {
+                    const elapsed = now - transitionStartTime;
+                    let t = Math.min(1, elapsed / transitionDuration);
+                    
+                    // Interpolação linear
+                    leftLiquidHeight = startLeftHeight + (targetLeftHeight - startLeftHeight) * t;
+                    rightLiquidHeight = startRightHeight + (targetRightHeight - startRightHeight) * t;
+                    
+                    if (t >= 1) {
+                        // Garantir valores exatos
+                        leftLiquidHeight = targetLeftHeight;
+                        rightLiquidHeight = targetRightHeight;
+                        
+                        // Iniciar pausa
+                        currentState = "pause";
+                        pauseStartTime = now;
                     }
-                    leftChanged = true;
-                }
-                
-                if (Math.abs(rightLiquidHeight - rightTarget) > 0.5) {
-                    const step = transitionSpeed * deltaSec;
-                    if (rightLiquidHeight < rightTarget) {
-                        rightLiquidHeight = Math.min(rightTarget, rightLiquidHeight + step);
-                    } else {
-                        rightLiquidHeight = Math.max(rightTarget, rightLiquidHeight - step);
+                } 
+                else if (currentState === "pause") {
+                    const paused = now - pauseStartTime;
+                    if (paused >= pauseDuration) {
+                        // Alternar os alvos para o próximo ciclo
+                        if (targetLeftHeight === TARGET_LEFT_LOW) {
+                            // Mudar: left vai para HIGH, right vai para LOW
+                            startLeftHeight = leftLiquidHeight;
+                            startRightHeight = rightLiquidHeight;
+                            targetLeftHeight = TARGET_LEFT_HIGH;
+                            targetRightHeight = TARGET_RIGHT_LOW;
+                        } else {
+                            // Mudar: left vai para LOW, right vai para HIGH
+                            startLeftHeight = leftLiquidHeight;
+                            startRightHeight = rightLiquidHeight;
+                            targetLeftHeight = TARGET_LEFT_LOW;
+                            targetRightHeight = TARGET_RIGHT_HIGH;
+                        }
+                        
+                        // Iniciar nova transição
+                        currentState = "transition";
+                        transitionStartTime = now;
                     }
-                    rightChanged = true;
+                }
+            }
+            
+            // Função principal de animação
+            function animate(timestamp) {
+                if (!lastTimestamp) {
+                    lastTimestamp = timestamp;
+                    requestAnimationFrame(animate);
+                    return;
                 }
                 
-                // Quando ambos atingirem os alvos com precisão, inicia pausa
-                if (!leftChanged && !rightChanged) {
-                    fase = 1; // pausa
-                    timer = 0;
-                }
-            }
-            // FASE 1: PAUSA (400ms)
-            else if (fase === 1) {
-                timer += deltaSec;
-                if (timer >= 0.4) {
-                    // Prepara reverso: laranja vai de 1/4 para 3/4, roxo vai de 3/4 para 1/4
-                    leftTarget = rightThreeQuarters;   // laranja sobe para 3/4 (atenção: recipiente esquerdo)
-                    rightTarget = rightQuarter;        // roxo desce para 1/4
-                    fase = 2;
-                    timer = 0;
-                }
-            }
-            // FASE 2: Laranja subindo (esq) de 1/4 para 3/4, Roxo descendo (dir) de 3/4 para 1/4
-            else if (fase === 2) {
-                let leftChanged = false;
-                let rightChanged = false;
-                
-                if (Math.abs(leftLiquidHeight - leftTarget) > 0.5) {
-                    const step = transitionSpeed * deltaSec;
-                    if (leftLiquidHeight < leftTarget) {
-                        leftLiquidHeight = Math.min(leftTarget, leftLiquidHeight + step);
-                    } else {
-                        leftLiquidHeight = Math.max(leftTarget, leftLiquidHeight - step);
-                    }
-                    leftChanged = true;
+                // Inicializar tempos se necessário
+                if (transitionStartTime === 0) {
+                    transitionStartTime = timestamp;
+                    startLeftHeight = cylinderHeight;
+                    startRightHeight = 0;
+                    targetLeftHeight = TARGET_LEFT_LOW;
+                    targetRightHeight = TARGET_RIGHT_HIGH;
+                    leftLiquidHeight = cylinderHeight;
+                    rightLiquidHeight = 0;
+                    currentState = "transition";
                 }
                 
-                if (Math.abs(rightLiquidHeight - rightTarget) > 0.5) {
-                    const step = transitionSpeed * deltaSec;
-                    if (rightLiquidHeight > rightTarget) {
-                        rightLiquidHeight = Math.max(rightTarget, rightLiquidHeight - step);
-                    } else {
-                        rightLiquidHeight = Math.min(rightTarget, rightLiquidHeight + step);
-                    }
-                    rightChanged = true;
-                }
+                updateAnimation(timestamp);
                 
-                if (!leftChanged && !rightChanged) {
-                    fase = 3; // pausa
-                    timer = 0;
-                }
-            }
-            // FASE 3: PAUSA (400ms) antes de reiniciar o ciclo
-            else if (fase === 3) {
-                timer += deltaSec;
-                if (timer >= 0.4) {
-                    // Reinicia ciclo: laranja vai para 1/4, roxo vai para 3/4
-                    leftTarget = leftQuarter;
-                    rightTarget = rightThreeQuarters;
-                    fase = 0;
-                    timer = 0;
-                }
-            }
-        }
-
-        // Renderização completa
-        function render() {
-            ctx.clearRect(0, 0, W, H);
-            ctx.fillStyle = '#0a0a0a';
-            ctx.fillRect(0, 0, W, H);
-            
-            // Desenha líquidos primeiro (para ficarem atrás das bordas? não, ordem: líquido depois contorno?
-            // Ordem correta: primeiro líquido (que é recortado), depois contorno do cilindro transparente sobreposto.
-            // Melhor desenhar líquido DENTRO do clip, mas o cilindro precisa ser redesenhado por cima para efeito de borda.
-            // Método: desenhar líquido, depois desenhar borda do cilindro por cima.
-            
-            // Líquido LARANJA (esquerda) - COR VIVA
-            drawLiquid(leftCylX, cylinderY, cylinderWidth, cylinderHeight, leftLiquidHeight, '#ff7b2c');
-            // Líquido ROXO (direita) - COR VIVA uniforme
-            drawLiquid(rightCylX, cylinderY, cylinderWidth, cylinderHeight, rightLiquidHeight, '#b45eff');
-            
-            // Contornos dos recipientes transparentes (por cima dos líquidos)
-            drawCylinder(leftCylX, cylinderY, cylinderWidth, cylinderHeight);
-            drawCylinder(rightCylX, cylinderY, cylinderWidth, cylinderHeight);
-            
-            // Pequenos detalhes de brilho nos vidros (apenas para dar aspecto transparente sem poluir)
-            ctx.save();
-            ctx.globalAlpha = 0.15;
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(leftCylX + 12, cylinderY + 8, 10, cylinderHeight - 16);
-            ctx.fillRect(rightCylX + 12, cylinderY + 8, 10, cylinderHeight - 16);
-            ctx.restore();
-        }
-
-        // Animação loop
-        let lastFrameTime = null;
-        
-        function animate(nowMs) {
-            if (!lastFrameTime) {
-                lastFrameTime = nowMs;
-                requestAnimationFrame(animate);
-                return;
+                // Desenhar tudo
+                ctx.clearRect(0, 0, W, H);
+                
+                // Fundo escuro
+                ctx.fillStyle = '#0f0f1a';
+                ctx.fillRect(0, 0, W, H);
+                
+                // Sombra suave nos cilindros
+                ctx.shadowBlur = 0;
+                
+                // Desenhar recipiente ESQUERDO (líquido laranja)
+                drawCylinder(leftCylX, cylinderY, cylinderRadius, cylinderHeight, leftLiquidHeight, '#FF8C42');
+                
+                // Desenhar recipiente DIREITO (líquido roxo)
+                drawCylinder(rightCylX, cylinderY, cylinderRadius, cylinderHeight, rightLiquidHeight, '#9B59B6');
+                
+                // Pequena linha de chão sutil
+                ctx.beginPath();
+                ctx.moveTo(0, cylinderY + cylinderHeight + 10);
+                ctx.lineTo(W, cylinderY + cylinderHeight + 10);
+                ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                
+                animationId = requestAnimationFrame(animate);
             }
             
-            let delta = Math.min(0.033, (nowMs - lastFrameTime) / 1000);
-            if (delta <= 0) {
-                lastFrameTime = nowMs;
-                requestAnimationFrame(animate);
-                return;
-            }
-            lastFrameTime = nowMs;
+            // Iniciar animação
+            animationId = requestAnimationFrame(animate);
             
-            updateLiquids(delta);
-            render();
+            // Limpeza
+            window.addEventListener('beforeunload', () => {
+                if (animationId) cancelAnimationFrame(animationId);
+            });
             
-            requestAnimationFrame(animate);
-        }
-        
-        // Configuração inicial: garantir alturas coerentes
-        leftLiquidHeight = cylinderHeight;      // laranja 100%
-        rightLiquidHeight = cylinderHeight * 0.25; // roxo 1/4
-        leftTarget = leftQuarter;                // primeiro movimento: laranja para 1/4
-        rightTarget = rightThreeQuarters;        // roxo para 3/4
-        fase = 0;
-        timer = 0;
-        
-        requestAnimationFrame(animate);
-        
-        // Evitar seleção / interações indesejadas
-        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-        canvas.addEventListener('selectstart', (e) => e.preventDefault());
-        
-        console.log('Sistema ativo: recipientes cilíndricos alternando níveis (laranja↔roxo)');
-    })();
-</script>
+            console.log('Sistema ativo: líquido laranja ↔ roxo alternando entre 1/4 e 3/4');
+        })();
+    </script>
 </body>
 </html>
